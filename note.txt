@@ -1,0 +1,10 @@
+Problemi:
+    1 - In modalità optim da risultati diversi da R, questo è dovuto
+        alla differenza tra l'implementazione tra Python ed R. Andrebbero studiati 
+        i parametri nel dettaglio. Il problema sembra riguardare la step-size
+        per la convergenza del gradiente, quindi vengono trovati due minimi diversi.
+        Nello specifico, i valori di funzione e i punti di ottimo risultano essere:
+        + R : 166752.2, [1.675021e+03 2.821560e-03 1.066184e-01]
+        + Py: 9017.795, [1.823739e+03, 1.41275e-03, 1.25875e-01]
+
+        Quindi python risulta più preciso e più lento
