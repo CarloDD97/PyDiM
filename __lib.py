@@ -2,9 +2,20 @@ import numpy as np
 import scipy.stats as st
 import matplotlib.pyplot as plt
 
-parameters = ['m ', 'p ', 'q ', 'a1', 'b1', 'c1', 'a2', 'b2', 'c2', 'a3', 'b3', 'c3']
+def set_params(model):
+    if model == 'BM' or model == 'GBM':
+        parameters = ['m ', 'p ', 'q ', 'a1', 'b1', 'c1', 'a2', 'b2', 'c2', 'a3', 'b3', 'c3']
+    elif model == 'GGM':
+        parameters = ['K ', 'pc', 'qc', 'ps', 'qs']
+    elif model == 'UCRCD':
+        parameters = ['ma   ', 'p1a  ', 'q1a  ', 'mc   ', 'p1c  ', 'p2   ', 'q1c  ', 'q2   ', 'delta']
+        parameters2 = ['mc   ', 'p1c  ', 'p2  ', 'q1c  ', 'q2  ', 'delta']
+    else:
+        parameters = None
+    return parameters
 
-def get_stats(ls, series, prelimestimates, method, alpha):
+def get_stats(ls, series, prelimestimates, method, alpha, model):
+    parameters = set_params(model)
     df = len(series) - len(ls[0])
     # print(df)
     y_mean = np.mean(prelimestimates)
@@ -82,16 +93,16 @@ def assign_significance(p_val):
         
     return sigs
 
-''' Da esportare in classe esterna'''
 def print_summary(stats):
     print('')
     # print('Non-linear least squares')
     print('Residuals:')
-    print('Min.    1st Qu.   Median  Mean    3rd Qu.  Max.')
+    print('Min.         1st Qu.     Median    Mean       3rd Qu.    Max.')
     res_stat = st.describe(stats['Residuals'])
-    print('% 5.3f   % 5.3f  % 5.3f  % 5.3f  % 5.3f  % 5.3f\n' % tuple([res_stat[1][0], \
+    print('% 5.6f   % 5.6f  % 5.6f  % 5.6f  % 5.6f  % 5.6f\n' % tuple([res_stat[1][0], \
         np.percentile(stats['Residuals'], 25), np.median(stats['Residuals']), res_stat[2], \
             np.percentile(stats['Residuals'], 75), res_stat[1][1]]))
+    
     print('Coefficents:')
     print("    Estimate      Std. Error    Lower         Upper          p-value")
     significance = assign_significance(stats['p-value'])
@@ -100,12 +111,44 @@ def print_summary(stats):
             % tuple([stats['Param'][i], stats['Estimate'][i], stats['Std. Error'][i], \
             stats['Lower'][i], stats['Upper'][i], stats['p-value'][i], significance[i]]))
     print('---')
+    
     print("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
-    print('Residual Standard Error: % 5.4f on %i degrees of freedom' %
+    print('Residual Standard Error: % 5.6f on %i degrees of freedom' %
             tuple([stats['RMSE'], stats['Df']]))
-    print('Multiple R-squared: % 5.5f Residual sum of squares: % 5.4f' %
+    print('Multiple R-squared: % 5.6f Residual sum of squares: % 5.6f' %
             tuple([np.sqrt(stats['R-squared']), stats['RSS']]))
     print('\n')
+#########################################################
+
+def print_ucrcd_summary(stats):
+    print('')
+    # print('Non-linear least squares')
+    for i in range(len(stats['Residuals'])):
+        print('Residuals Series % i:' % (i+1))
+        print('Min.    1st Qu.   Median  Mean    3rd Qu.  Max.')
+        res_stat = st.describe(stats['Residuals'][i])
+        print('% 5.3f   % 5.3f  % 5.3f  % 5.3f  % 5.3f  % 5.3f\n' % tuple([res_stat[1][0], \
+            np.percentile(stats['Residuals'][i], 25), np.median(stats['Residuals'][i]), res_stat[2], \
+                np.percentile(stats['Residuals'][i], 75), res_stat[1][1]]))
+    
+
+    print('Coefficents:')
+    print("       Estimate      Std. Error    Lower         Upper          p-value")
+    significance = assign_significance(stats['p-value'])
+    for i in range(len(stats['Param'])):
+        print("% s % .4e   % .4e   % .4e   % .4e    % .4e % s" \
+            % tuple([stats['Param'][i], stats['Estimate'][i], stats['Std. Error'][i], \
+            stats['Lower'][i], stats['Upper'][i], stats['p-value'][i], significance[i]]))
+    print('---')
+    print("Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n")
+
+    for j in range(len(stats['RMSE'])):
+        print('Residual Standard Error series % i: % 5.6f on %i degrees of freedom' %
+                tuple([(j+1), stats['RMSE'][j], stats['Df'][j]]))
+    print('Multiple R-squared: % 5.6f Residual sum of squares: % 5.6f' %
+            tuple([stats['R-squared'], stats['RSS']]))
+    print('\n')
+
 
 def plot_models(t, cumsum, x_lim, z, series, z_prime):
         plt.figure(figsize=(20,6))
@@ -126,3 +169,6 @@ def plot_models(t, cumsum, x_lim, z, series, z_prime):
         plt.title('Instantaneous')
         plt.legend(['Observed', 'Predicted'])
         plt.show()
+
+def plot_ucrcd():
+    print('cacca')

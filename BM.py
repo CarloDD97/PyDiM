@@ -33,21 +33,24 @@ def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=T
     def f(par, t):
         return np.sum(ff1(par, t)**2)
 
+    # def zprime(t, m, p, q):
+    #     return m * (p + q * (ff(t, m, p, q) / m)) * (1 - (ff(t, m, p, q) / m))
+
     def zprime(t, m, p, q):
-        return m * (p + q * (ff(t, m, p, q) / m)) * (1 - (ff(t, m, p, q) / m))
+        return m * (p*(p + q)**2 * np.exp((p + q) * t)) / ((p * np.exp((p + q) * t))+q)**2
 
     def zprime_return(par, t):
-        m = par[1]
-        p = par[2]
-        q = par[3]
+        m = par[0]
+        p = par[1]
+        q = par[2]
         return m * (1 - np.exp(-(p + q) * t)) / (1 + q / p * np.exp(-(p + q) *
                                                                     t))
     if method == "nls":
         # ls = scipy.optimize.least_squares(fun=ff1, x0=par, args=(t), method='lm', max_nfev=200, verbose=1)
-        ls = opt.leastsq(func=ff1, x0=prelimestimates, args=(t), maxfev=200, full_output=1)
-        stime = ls[0]
-        res = ls[2]['fvec']
-        est = __lib.get_stats(ls, series, prelimestimates, method, alpha)
+        optim = opt.leastsq(func=ff1, x0=prelimestimates, args=(t), full_output=1)
+        stime = optim[0]
+        res = optim[2]['fvec']
+        est = __lib.get_stats(optim, series, prelimestimates, method, alpha, model='BM')
         # print_summary(aa)
 
     elif method == "optim":
@@ -63,17 +66,19 @@ def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=T
 
         stime = optim.x
         res = ff1(stime, t)
-        est = __lib.get_stats(optim, series, prelimestimates, method, alpha)
+        
+        est = __lib.get_stats(optim, series, prelimestimates, alpha, model = 'BM', method=method)
 
-    __lib.print_summary(est)
+    # __lib.print_summary(est)
+
+    z = ff(x_lim, stime[0], stime[1], stime[2])
+    z_prime = np.gradient(z)
 
     if display:
-        z = [ff(x_lim[i], stime[0], stime[1], stime[2]) for i in range(len(x_lim))]
-        z_prime = np.gradient(z)
         __lib.plot_models(t, cumsum, x_lim, z, series, z_prime) 
 
     s_hat = ff2(stime, t)
-
+    
     ao = {
         'model' : stime,
         'type' :"Standard Bass Model",
@@ -82,8 +87,10 @@ def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=T
         # 'r_squared' : aa['R-squared'],
         # 'RSS' : aa['RSS'],
         # 'residuals' : aa['Residuals'],
-        'fitted' : s_hat,
-        'data' : cumsum
+        'fitted' : s_hat
+        # 'instantaneous' : z_prime
+        # 'data' : cumsum
         }
 
+    del(est)
     return ao

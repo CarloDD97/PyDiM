@@ -114,7 +114,7 @@ def GBM(series, shock=None, nshock=0,
 
         for i in range(1, nshock+1):
             z_part += intx(t, i, shock_par)
-            
+
         z_prime = t + z_part
         z = m * (1 - np.exp(-(p+q)*z_prime)) / (1+(q/p)*np.exp(-(p+q)*z_prime))
         return z
@@ -129,9 +129,9 @@ def GBM(series, shock=None, nshock=0,
                      args=(t), full_output=1)
     stime = ls[0]
     res = ls[2]['fvec']
-    est = __lib.get_stats(ls=ls, series=series, prelimestimates=list(prelimestimates[:3]), method='nls', alpha=alpha)
+    est = __lib.get_stats(ls=ls, series=series, prelimestimates=list(prelimestimates[:3]), method='nls', alpha=alpha, model='GBM')
 
-    __lib.print_summary(est)
+    # __lib.print_summary(est)
 
     if display:
         z = [ff(stime, x_lim[i]) for i in range(len(x_lim))]
@@ -140,12 +140,14 @@ def GBM(series, shock=None, nshock=0,
 
     s_hat = ff2(stime, t)
 
+    if len(shock) > 1 : shock = ['mixed']
     ao = {
         'model' : stime,
-        'type' :"Generalized Bass Model",
+        'type' :("Generalized Bass Model with % i % s shock(s)"% tuple([nshock, shock[0]])),
         'estimate' : est,
         'fitted' : s_hat,
-        'data' : cumsum
+        'instantaneous' : z_prime
+        # 'data' : cumsum
         }
 
     return ao
