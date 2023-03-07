@@ -8,7 +8,9 @@ from BM import BM
 
 def UCRCD(series1, series2, par = "double", prelimest_series1 = None, 
         prelimest_series2= None, alpha=0.05, delta=0.01, gamma=0.01, display=True):
-
+    
+    series1 = series1.reset_index(drop=True)
+    series2 = series2.reset_index(drop=True)
     # The below operation is not present in the R's implementation, altought
     # this case should be considered to avoid errors.
     if len(series2) > len(series1):
@@ -26,9 +28,10 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
     len_s1 = len(series1)
     len_s2 = len(series2)
     c2i = len_s1 - len_s2
+    print(len_s1, len_s2, c2i)
     c2 = c2i
     
-    tot = np.concatenate([series1.reset_index(drop=True), series2.reset_index(drop=True)])
+    tot = np.concatenate([series1.reset_index(drop=False), series2.reset_index(drop=False)])
     cumsum1 = np.cumsum(series1)
     cumsum2 = np.cumsum(series2)
     end = len(series1)
@@ -58,7 +61,7 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
     ###############################################
     ################ Shared Params ################
 
-    t = np.arange(c2i, end, 1)
+    t = np.arange(c2, end, 1)
     Z1 = np.cumsum(series1)
     Z2 = np.cumsum(series2)
 
@@ -90,9 +93,12 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
       
     if par == 'unique':
         parms = [(m1+m2)*2, p1c, p2, q1c, q2, delta]
-        
+        # print(parms)
         fitval1 = opt.leastsq(func=res_model, x0=parms, args=(t), maxfev=10000, full_output=1)
-        stats = __lib.get_stats(fitval1, tot, prelimestimates=parms, alpha=alpha, model='UCRCD', method='nls')
+        
+        df = len_s2*2 - len(parms)
+        stats = __lib.get_stats(fitval1, tot, prelimestimates=parms, alpha=alpha, model='UCRCD', method='nls', df=df)
+        # __lib.print_summary(stats)
 
         parest = stats['Estimate']
         mc, p1c, p2, q1c, q2, delta = tuple(stats['Estimate'])
@@ -134,8 +140,11 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
         parms = [(m1+m2)*2, p1c, p2, q1c, q2, delta, gamma]
 
         fitval1 = opt.leastsq(func=res_model, x0=parms, args=(t), maxfev=10000, full_output=1)
-        stats = __lib.get_stats(fitval1, tot, prelimestimates=parms, alpha=alpha, model='UCRCD', method='nls')
         
+        df = len_s2*2 - len(parms)
+        stats = __lib.get_stats(fitval1, tot, prelimestimates=parms, alpha=alpha, model='UCRCD', method='nls', df=df)
+        # __lib.print_summary(stats)
+
         parest = stats['Estimate']
         mc, p1c, p2, q1c, q2, delta, gamma = tuple(stats['Estimate'])
         
@@ -203,7 +212,7 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
     MSE = [np.sum(resid[0]**2) / df[0], np.sum(resid[1]**2) / df[1]]
     RMSE = np.sqrt(MSE)
 
-    t = np.arange(1, end)
+    t = np.arange(0, end)
     t2 = np.arange(c2, end)
 
     est = {
@@ -221,9 +230,10 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
         'RSS': rss
     }
     
-    # __lib.print_ucrcd_summary(est)
+    __lib.print_ucrcd_summary(est)
+
     if display:
-        __lib.plot_ucrcd()
+        __lib.plot_ucrcd(t, t2, cc1, cc2, ss1, ss2, gg1, gg2, pp1, pp2)
 
     ao = {
         'model' : Estimate1[:,0],

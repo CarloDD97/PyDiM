@@ -7,6 +7,13 @@ Problemi:
         + R : 166752.2, [1.675021e+03 2.821560e-03 1.066184e-01]
         + Py: 9017.795, [1.823739e+03, 1.41275e-03, 1.25875e-01]
 
+    2 - nel calcolo di p-value per "mc" in UCRCD c'è qualche errore se si sceglie "unique"
+        però stampando le statistiche intermedie dei parametri (Righe 101 e 146 in UCRCD.py) i risultati
+        sono esatti sia in R che in Python. Nel sommario generale R lo riporta diverso dalle
+        statistiche intermedie, questo fattore è dato dall'utilizzo della funzione "signif" usata in R,
+        la quale, non trovando nei primi 3 decimali un numero significativo, rimpiazza il p-value di mc 
+        (e.g. 2.2204 e-16) con 8.80e-17. In ogni caso i risultati in Python sono coerenti
+
 Note di design:
     - L'implementazione di GBM richiede in input il parametro 'prelimestimates'
     che l'utente dovrebbe ricavarsi dal Bass Model applicato alla serie,

@@ -8,15 +8,16 @@ def set_params(model):
     elif model == 'GGM':
         parameters = ['K ', 'pc', 'qc', 'ps', 'qs']
     elif model == 'UCRCD':
-        parameters = ['ma   ', 'p1a  ', 'q1a  ', 'mc   ', 'p1c  ', 'p2   ', 'q1c  ', 'q2   ', 'delta']
-        parameters2 = ['mc   ', 'p1c  ', 'p2  ', 'q1c  ', 'q2  ', 'delta']
+        parameters = ['ma   ', 'p1a  ', 'q1a  ', 'mc   ', 'p1c  ', 'p2   ', 'q1c  ', 'q2   ', 'delta', 'gamma']
     else:
         parameters = None
     return parameters
 
-def get_stats(ls, series, prelimestimates, method, alpha, model):
+def get_stats(ls, series, prelimestimates, method, alpha, model, df = None):
     parameters = set_params(model)
-    df = len(series) - len(ls[0])
+    
+    if df != None: df = df
+    else: df = len(series) - len(ls[0])
     # print(df)
     y_mean = np.mean(prelimestimates)
     TSS = np.sum((series-y_mean)**2)
@@ -125,9 +126,9 @@ def print_ucrcd_summary(stats):
     # print('Non-linear least squares')
     for i in range(len(stats['Residuals'])):
         print('Residuals Series % i:' % (i+1))
-        print('Min.    1st Qu.   Median  Mean    3rd Qu.  Max.')
+        print('Min.         1st Qu.     Median      Mean    3rd Qu.     Max.')
         res_stat = st.describe(stats['Residuals'][i])
-        print('% 5.3f   % 5.3f  % 5.3f  % 5.3f  % 5.3f  % 5.3f\n' % tuple([res_stat[1][0], \
+        print('% 5.6f   % 5.6f  % 5.6f  % 5.6f  % 5.6f  % 5.6f\n' % tuple([res_stat[1][0], \
             np.percentile(stats['Residuals'][i], 25), np.median(stats['Residuals'][i]), res_stat[2], \
                 np.percentile(stats['Residuals'][i], 75), res_stat[1][1]]))
     
@@ -135,7 +136,7 @@ def print_ucrcd_summary(stats):
     print('Coefficents:')
     print("       Estimate      Std. Error    Lower         Upper          p-value")
     significance = assign_significance(stats['p-value'])
-    for i in range(len(stats['Param'])):
+    for i in range(len(stats['Estimate'])):
         print("% s % .4e   % .4e   % .4e   % .4e    % .4e % s" \
             % tuple([stats['Param'][i], stats['Estimate'][i], stats['Std. Error'][i], \
             stats['Lower'][i], stats['Upper'][i], stats['p-value'][i], significance[i]]))
@@ -170,5 +171,27 @@ def plot_models(t, cumsum, x_lim, z, series, z_prime):
         plt.legend(['Observed', 'Predicted'])
         plt.show()
 
-def plot_ucrcd():
-    print('cacca')
+def plot_ucrcd(t, t2, cc1, cc2, ss1, ss2, gg1, gg2, pp1, pp2):
+    plt.figure(figsize=(20,6))
+
+    plt.subplot(121)
+    plt.plot(t, cc1, 'o-' )
+    plt.plot(t2, cc2, 'o-' )
+    plt.plot(t, gg1, 'r')
+    plt.plot(t2, gg2, 'b')
+    plt.xlabel('t')
+    plt.ylabel('z(t)')
+    plt.title('Cumulative')
+    plt.legend(['Observed 1', 'Observed 2', 'Predicted 1', 'Predicted 2'])
+
+    plt.subplot(122)
+    plt.plot(t, ss1, 'o-' )
+    plt.plot(t2, ss2, 'o-' )
+    plt.plot(t, pp1, 'r')
+    plt.plot(t2, pp2, 'b')
+    plt.xlabel('t')
+    plt.ylabel("z'(t)")
+    plt.title('Instantaneous')
+    plt.legend(['Observed 1', 'Observed 2', 'Predicted 1', 'Predicted 2'])
+
+    plt.show()
