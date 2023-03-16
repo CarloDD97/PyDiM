@@ -1,5 +1,5 @@
 Problemi:
-    1 - In modalità optim da risultati diversi da R, questo è dovuto
+    1 - BM In modalità optim da risultati diversi da R, questo è dovuto
         alla differenza tra l'implementazione tra Python ed R. Andrebbero studiati 
         i parametri nel dettaglio. Il problema sembra riguardare la step-size
         per la convergenza del gradiente, quindi vengono trovati due minimi diversi.

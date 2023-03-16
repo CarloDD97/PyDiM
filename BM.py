@@ -9,7 +9,7 @@ import seaborn as sns
 
 import __lib
 
-def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=True):
+def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=True, stats = True):
     if len(prelimestimates) == 0:
         prelimestimates = np.array([np.sum(series)+100, 0.01, 0.1])
     if oos == None:
@@ -20,34 +20,31 @@ def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=T
     x_lim = np.arange(1, len(series)+1+oos, 1)
     # s = series
     cumsum = np.cumsum(series)
-
-    def ff(t, m, p, q):
-        return (m * (1 - np.exp(- np.multiply((p + q), t))) / (1 + q / p * np.exp(-np.multiply((p + q), t))))
     
-    def ff1(par, t):
+    def ff(t, m, p, q):
+            return (m * (1 - np.exp(- np.multiply((p + q), t))) / (1 + q / p * np.exp(-np.multiply((p + q), t))))
+        
+    def zprime(t, m, p, q):
+            return m * (p*(p + q)**2 * np.exp((p + q) * t)) / ((p * np.exp((p + q) * t))+q)**2
+
+    def residuals(par, t):
         return cumsum - ff(t, par[0], par[1], par[2])
 
     def ff2(par, t):
         return ff(t, par[0], par[1], par[2])
 
     def f(par, t):
-        return np.sum(ff1(par, t)**2)
+        return np.sum(residuals(par, t)**2)
 
-    # def zprime(t, m, p, q):
-    #     return m * (p + q * (ff(t, m, p, q) / m)) * (1 - (ff(t, m, p, q) / m))
-
-    def zprime(t, m, p, q):
-        return m * (p*(p + q)**2 * np.exp((p + q) * t)) / ((p * np.exp((p + q) * t))+q)**2
-
-    def zprime_return(par, t):
-        m = par[0]
-        p = par[1]
-        q = par[2]
-        return m * (1 - np.exp(-(p + q) * t)) / (1 + q / p * np.exp(-(p + q) *
-                                                                    t))
+    # def zprime_return(par, t):
+    #     m = par[0]
+    #     p = par[1]
+    #     q = par[2]
+    #     return m * (1 - np.exp(-(p + q) * t)) / (1 + q / p * np.exp(-(p + q) *  t))
+                                                                    
     if method == "nls":
         # ls = scipy.optimize.least_squares(fun=ff1, x0=par, args=(t), method='lm', max_nfev=200, verbose=1)
-        optim = opt.leastsq(func=ff1, x0=prelimestimates, args=(t), full_output=1)
+        optim = opt.leastsq(func=residuals, x0=prelimestimates, args=(t), full_output=1)
         stime = optim[0]
         res = optim[2]['fvec']
         est = __lib.get_stats(optim, series, prelimestimates, method, alpha, model='BM')
@@ -65,31 +62,29 @@ def BM(series, method="nls", prelimestimates=[], oos=None, alpha=0.05, display=T
         # aa =stima_optim[0]
 
         stime = optim.x
-        res = ff1(stime, t)
+        # res = residuals(stime, t)
         
         est = __lib.get_stats(optim, series, prelimestimates, alpha, model = 'BM', method=method)
 
-    # __lib.print_summary(est)
-
-    z = ff(x_lim, stime[0], stime[1], stime[2])
-    z_prime = np.gradient(z)
+    if stats:
+        __lib.print_summary(est)
 
     if display:
+        z = ff(x_lim, stime[0], stime[1], stime[2])
+        z_prime = zprime(x_lim, stime[0], stime[1], stime[2]) 
         __lib.plot_models(t, cumsum, x_lim, z, series, z_prime) 
 
-    s_hat = ff2(stime, t)
-    
+    z = ff2(stime, t)
+    z_prime = zprime(t, stime[0], stime[1], stime[2])
+
     ao = {
         'model' : stime,
+        'data' : series,
         'type' :"Standard Bass Model",
         'estimate' : est,
-        # 'coefficients' : aa['Estimate'],
-        # 'r_squared' : aa['R-squared'],
-        # 'RSS' : aa['RSS'],
-        # 'residuals' : aa['Residuals'],
-        'fitted' : s_hat
-        # 'instantaneous' : z_prime
-        # 'data' : cumsum
+        'functions' : [ff2, zprime],
+        'fitted' : z,
+        'instantaneous' : z_prime
         }
 
     del(est)

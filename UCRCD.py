@@ -7,7 +7,8 @@ import __lib
 from BM import BM
 
 def UCRCD(series1, series2, par = "double", prelimest_series1 = None, 
-        prelimest_series2= None, alpha=0.05, delta=0.01, gamma=0.01, display=True):
+        prelimest_series2= None, alpha=0.05, delta=0.01, gamma=0.01, 
+        display=True, stats=True):
     
     series1 = series1.reset_index(drop=True)
     series2 = series2.reset_index(drop=True)
@@ -17,27 +18,26 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
         series1, series2 = tuple([series2, series1])
 
     if prelimest_series1 == None:
-        prelimest_series1 = BM(series1, display=0)['estimate']
+        prelimest_series1 = BM(series1, display=0, stats=0)['estimate']
     if prelimest_series2 == None:
-        prelimest_series2 = BM(series2, display=0)['estimate']
+        prelimest_series2 = BM(series2, display=0, stats=0)['estimate']
 
     m1, p1c, q1c = tuple(prelimest_series1['Estimate'][:])
     m2, p2, q2 = tuple(prelimest_series2['Estimate'][:])
     del(prelimest_series1, prelimest_series2)
 
-    len_s1 = len(series1)
-    len_s2 = len(series2)
-    c2i = len_s1 - len_s2
-    print(len_s1, len_s2, c2i)
+    c2i = len(series1) - len(series2)
     c2 = c2i
     
+    m1s = m1
+
     tot = np.concatenate([series1.reset_index(drop=False), series2.reset_index(drop=False)])
-    cumsum1 = np.cumsum(series1)
-    cumsum2 = np.cumsum(series2)
+    data1 = np.cumsum(series1)
+    data2 = np.cumsum(series2)
     end = len(series1)
 
     if c2i > 0 :
-        s1 = series1[:c2i].reset_index(drop=True)
+        s1 = series1[:c2i]
         series1 = series1[c2 : end].reset_index(drop=True)
         t = np.arange(1, c2i+1, 1)
         s2 = np.zeros(c2i)
@@ -53,7 +53,7 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
         p1a_ = [stats1['Estimate'][1], stats1['Std. Error'][1], stats1['Lower'][1], stats1['Upper'][1], stats1['p-value'][1]]
         q1a_ = [stats1['Estimate'][2], stats1['Std. Error'][2], stats1['Lower'][2], stats1['Upper'][2], stats1['p-value'][2]]
 
-        pred_BM1 = BMs1['fitted'] - np.insert(BMs1['fitted'][:-1], 0, 0) # instantanous
+        pred_BM1 = BMs1['instantaneous'] #- np.insert(BMs1['fitted'][:-1], 0, 0) # instantanous
 
         o_bass = pd.DataFrame.from_dict({'t': t, 's1': s1, 's2': s2, 'Z1': Z1, 'Z2': Z2})
         p_bass = pd.DataFrame.from_dict({'t': t, 'pred_1': pred_BM1, 'pred_2': s2})
@@ -62,14 +62,14 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
     ################ Shared Params ################
 
     t = np.arange(c2, end, 1)
-    Z1 = np.cumsum(series1)
-    Z2 = np.cumsum(series2)
+    Z1 = data1[c2:end].reset_index(drop=True)
+    Z2 = data2
 
     data = pd.DataFrame.from_dict({'t': t, 's1': series1, 's2': series2, 'Z1': Z1, 'Z2': Z2})
     expdf = pd.melt(data.iloc[:,:3], id_vars='t', var_name="product", value_name="response")
 
     
-    def model(t, parms):
+    def model(t, parms, par):
         Z = Z1+Z2
         if par == 'unique':
             mc, p1c, p2, q1c, q2, delta = tuple(parms)
@@ -82,8 +82,8 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
 
         return {'z1':z1, 'z2': z2, 't':t}
 
-    def res_model(parms, t):
-        est = model(t=t, parms=parms)
+    def res_model(parms, t, par):
+        est = model(t=t, parms=parms, par=par)
         data = pd.DataFrame.from_dict({'t':est['t'], 'z1_s': est['z1'], 'z2_s': est['z2']})
         preddf = pd.melt(data, id_vars='t', var_name='product', value_name='response')
         residuals = preddf['response'] - expdf['response']
@@ -92,11 +92,11 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
     ###############################################  
       
     if par == 'unique':
-        parms = [(m1+m2)*2, p1c, p2, q1c, q2, delta]
+        parms = [(m1s+m2)*2, p1c, p2, q1c, q2, delta]
         # print(parms)
-        fitval1 = opt.leastsq(func=res_model, x0=parms, args=(t), maxfev=10000, full_output=1)
+        fitval1 = opt.leastsq(func=res_model, x0=parms, args=(t, par), maxfev=10000, full_output=1)
         
-        df = len_s2*2 - len(parms)
+        df = len(series2) * 2 - len(parms)
         stats = __lib.get_stats(fitval1, tot, prelimestimates=parms, alpha=alpha, model='UCRCD', method='nls', df=df)
         # __lib.print_summary(stats)
 
@@ -110,7 +110,7 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
             Estimate = [m1, p1a, q1a, mc, p1c, q1c + delta, q1c, p2, q2, q2-delta]
             Estimate1 = np.row_stack([m1_, p1a_, q1a_, stack_stats])
             
-            estimates = model(t, parest)
+            estimates = model(t, parest, par)
             z_prime = pd.DataFrame.from_dict({'t':estimates['t'], 'pred_1': estimates['z1'], 'pred_2': estimates['z2']})
             del(estimates)
 
@@ -122,26 +122,26 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
             z_prime = data_p
 
         if c2i == 0:
-            Estimate = [mc, p1c, q1c + delta, q1c, p2, q2, q2-delta]
+            Estimate = [mc, p1c, q1c + delta, q1c, p2, q2, q2 - delta]
             Estimate1 = stack_stats
             
-            estimates = model(t, parest)
+            estimates = model(t, parest, par)
             z_prime = pd.DataFrame.from_dict({'t':estimates['t'], 'pred_1': estimates['z1'], 'pred_2': estimates['z2']})
             del(estimates)
 
-            data['t'] = np.arange(c2,end)
-            z_prime['t'] = np.arange(c2,end)
+            data['t'] = np.arange(c2, end)
+            z_prime['t'] = np.arange(c2, end)
             
         obs = pd.melt(data.iloc[:,:3], id_vars=['t'], var_name='product', value_name='consumption')
         pred = pd.melt(z_prime, id_vars=['t'], var_name='product', value_name='consumption')
         res = obs['consumption'] - pred['consumption']
 
     if par == 'double':
-        parms = [(m1+m2)*2, p1c, p2, q1c, q2, delta, gamma]
+        parms = [(m1s+m2)*2, p1c, p2, q1c, q2, delta, gamma]
 
-        fitval1 = opt.leastsq(func=res_model, x0=parms, args=(t), maxfev=10000, full_output=1)
+        fitval1 = opt.leastsq(func=res_model, x0=parms, args=(t, par), maxfev=10000, full_output=1)
         
-        df = len_s2*2 - len(parms)
+        df = len(series2) * 2 - len(parms)
         stats = __lib.get_stats(fitval1, tot, prelimestimates=parms, alpha=alpha, model='UCRCD', method='nls', df=df)
         # __lib.print_summary(stats)
 
@@ -185,10 +185,10 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
 
     #######################################
 
-    if c2i >= 0:
-        data = [obs['consumption'][0:end], obs['consumption'][end+c2 : 2*end]]
-        fitted = [pred['consumption'][0:end], pred['consumption'][end+c2 : 2*end]]
-        resid = [res[0:end], res[end+c2: 2*end]]
+    
+    data = [obs['consumption'][0:end], obs['consumption'][end+c2 : 2*end]]
+    fitted = [pred['consumption'][0:end], pred['consumption'][end+c2 : 2*end]]
+    resid = [res[0:end], res[end+c2: 2*end]]
 
     tss = np.sum((obs['consumption']- np.mean(obs['consumption']))**2)
     rss = np.sum(res**2)
@@ -205,10 +205,11 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
     gg2 = np.cumsum(pp2)
 
     FITTED = [gg1, gg2]
+    INSTANT = [pp1, pp2]
     DATA = [cc1, cc2]
     RESIDUALS = [gg1-cc1, gg2-cc2]
 
-    df = [len_s1-len(Estimate1[:,0]), len_s2-len(Estimate1[:,0])]
+    df = [len(series1)-len(Estimate1[:,0]), len(series2)-len(Estimate1[:,0])]
     MSE = [np.sum(resid[0]**2) / df[0], np.sum(resid[1]**2) / df[1]]
     RMSE = np.sqrt(MSE)
 
@@ -227,19 +228,26 @@ def UCRCD(series1, series2, par = "double", prelimest_series1 = None,
         'RMSE': RMSE,
         'Df': df,
         'R-squared': r_squared,
-        'RSS': rss
+        'RSS': rss,
+        'UCRCD_Resid' : RESIDUALS,
+        'UCRCD_Data': DATA
     }
     
-    __lib.print_ucrcd_summary(est)
+    if stats:
+        __lib.print_ucrcd_summary(est)
 
     if display:
+        # t, t2, cumsum1, cumsum2, series1, series2, z1, z2, z1_prime, z2_prime
         __lib.plot_ucrcd(t, t2, cc1, cc2, ss1, ss2, gg1, gg2, pp1, pp2)
 
     ao = {
-        'model' : Estimate1[:,0],
+        'model' : model,
+        'data': [ss1, ss2],
         'type' :"UCRCD Model",
+        'par': par,
         'estimate' : est,
-        'fitted' : FITTED
+        'fitted' : FITTED,
+        'instantaneous': INSTANT 
         }
         
     return ao

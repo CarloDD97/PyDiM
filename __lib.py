@@ -171,24 +171,22 @@ def plot_models(t, cumsum, x_lim, z, series, z_prime):
         plt.legend(['Observed', 'Predicted'])
         plt.show()
 
-def plot_ucrcd(t, t2, cc1, cc2, ss1, ss2, gg1, gg2, pp1, pp2):
+def plot_ucrcd(t, t2, cumsum1, cumsum2, series1, series2, z1, z2, z1_prime, z2_prime):
     plt.figure(figsize=(20,6))
 
     plt.subplot(121)
-    plt.plot(t, cc1, 'o-' )
-    plt.plot(t2, cc2, 'o-' )
-    plt.plot(t, gg1, 'r')
-    plt.plot(t2, gg2, 'b')
+    plt.plot(t, cumsum1, 'o-' , t2, cumsum2, 'o-' )
+    plt.plot(t, z1, 'r', t2, z2, 'b')
     plt.xlabel('t')
     plt.ylabel('z(t)')
     plt.title('Cumulative')
     plt.legend(['Observed 1', 'Observed 2', 'Predicted 1', 'Predicted 2'])
 
     plt.subplot(122)
-    plt.plot(t, ss1, 'o-' )
-    plt.plot(t2, ss2, 'o-' )
-    plt.plot(t, pp1, 'r')
-    plt.plot(t2, pp2, 'b')
+    plt.plot(t, series1, 'o-' )
+    plt.plot(t2, series2, 'o-' )
+    plt.plot(t, z1_prime, 'r')
+    plt.plot(t2, z2_prime, 'b')
     plt.xlabel('t')
     plt.ylabel("z'(t)")
     plt.title('Instantaneous')

@@ -2,12 +2,13 @@ import BM
 import numpy as np
 import scipy.stats as st
 import scipy.optimize as opt
+import matplotlib.pyplot as plt
 
 import __lib
 
 def GBM(series, shock=None, nshock=0,
         prelimestimates=None, alpha=0.05, oos=None,
-        display=True):
+        display=True, stats = True):
 
     if shock == None or shock not in ["exp", "rett", "mixed"]:
         print("wrong value in 'shock' variable")
@@ -52,7 +53,7 @@ def GBM(series, shock=None, nshock=0,
         c = shock_par[3*index+2]
         xt = (c*np.exp(np.dot(b, (t-a))))*(t >= a)
 
-        return 1 + xt # 1+ va tolto nella generalizzazione
+        return xt # 1+ va tolto nella generalizzazione
 
     '''RECTANGULAR SHOCKS GENERALIZED FUNCTIONS'''
     def rett_intx_gen(t, index, shock_par):
@@ -69,7 +70,7 @@ def GBM(series, shock=None, nshock=0,
         c = shock_par[3*index+2]
         xt = c*(t>=a)*(t<=b)
 
-        return 1 + xt
+        return xt
 
     '''RECTANGULAR SHOCKS GENERALIZED FUNCTIONS'''
     # Qui è un po' rattoppato, faccio in modo che se vogliamo possiamo
@@ -106,7 +107,7 @@ def GBM(series, shock=None, nshock=0,
         intx = mix_intx_gen
         xt = mix_xt_gen
 
-    def ff(shock_par, t):
+    def ff(shock_par, t, nshock, intx):
         z_part = 0        
         m = shock_par[0]
         p = shock_par[1]
@@ -114,40 +115,59 @@ def GBM(series, shock=None, nshock=0,
 
         for i in range(1, nshock+1):
             z_part += intx(t, i, shock_par)
-
         z_prime = t + z_part
         z = m * (1 - np.exp(-(p+q)*z_prime)) / (1+(q/p)*np.exp(-(p+q)*z_prime))
         return z
 
-    def ff1(shock_par, t):
-        return cumsum - ff(shock_par, t)
+    def zprime(shock_par, t, nshock, intx, xt):
+        z_part = 0        
+        m = shock_par[0]
+        p = shock_par[1]
+        q = shock_par[2]
 
-    def ff2(shock_par, t):
-        return ff(shock_par, t)
+        for i in range(1, nshock+1):
+            z_part += xt(t, i, shock_par)
+        z_prime = 1 + z_part
+        z = m * (p + q * (ff(shock_par, t, nshock, intx)/m))\
+             * (1 - (ff(shock_par, t, nshock, intx)/m))\
+             * z_prime
+        return z
+
+    def ff1(shock_par, t, nshock, intx):
+        return cumsum - ff(shock_par, t, nshock, intx)
+
+    def ff2(shock_par, t, nshock, intx):
+        return ff(shock_par, t, nshock, intx)
 
     ls = opt.leastsq(func=ff1, x0=prelimestimates,
-                     args=(t), full_output=1)
+                     args=(t, nshock, intx), full_output=1)
     stime = ls[0]
     res = ls[2]['fvec']
     est = __lib.get_stats(ls=ls, series=series, prelimestimates=list(prelimestimates[:3]), method='nls', alpha=alpha, model='GBM')
 
-    # __lib.print_summary(est)
+    if stats:
+        __lib.print_summary(est)
 
     if display:
-        z = [ff(stime, x_lim[i]) for i in range(len(x_lim))]
-        z_prime = np.gradient(z)
+        z = ff(stime, x_lim, nshock, intx)
+        # z_prime = np.gradient(z)
+        z_prime = zprime(stime, x_lim, nshock, intx, xt)
         __lib.plot_models(t, cumsum, x_lim, z, series, z_prime) 
 
-    s_hat = ff2(stime, t)
+    z = ff(stime, t, nshock, intx)
+    z_prime = zprime(stime, t, nshock, intx, xt)
 
     if len(shock) > 1 : shock = ['mixed']
     ao = {
         'model' : stime,
-        'type' :("Generalized Bass Model with % i % s shock(s)"% tuple([nshock, shock[0]])),
+        'data' : series,
+        'type' :"Generalized Bass Model",
+        'shocks' : [nshock, shock],
+        'x_functions': [intx, xt],
+        'functions' : [ff, zprime],
         'estimate' : est,
-        'fitted' : s_hat,
+        'fitted' : z,
         'instantaneous' : z_prime
-        # 'data' : cumsum
         }
 
     return ao
