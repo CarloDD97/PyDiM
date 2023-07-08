@@ -1,0 +1,16 @@
+README.md
+setup.py
+PyDiM/BM.py
+PyDiM/GBM.py
+PyDiM/GGM.py
+PyDiM/UCRCD.py
+PyDiM/__init__.py
+PyDiM/_lib.py
+PyDiM/_predict.py
+PyDiM/plot.py
+PyDiM/summary.py
+PyDiM.egg-info/PKG-INFO
+PyDiM.egg-info/SOURCES.txt
+PyDiM.egg-info/dependency_links.txt
+PyDiM.egg-info/requires.txt
+PyDiM.egg-info/top_level.txt
