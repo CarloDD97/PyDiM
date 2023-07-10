@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as opt
+import warnings
 
 from PyDiM import _lib as lib
 from PyDiM import plot
@@ -47,17 +48,13 @@ def gbm(series, shock, nshock, prelimestimates, alpha=0.05, oos=None, display=Tr
     """
 
     if shock == None or shock not in ["exp", "rett", "mixed"]:
-        print("wrong value in 'shock' variable")
-        return 0
+        raise ValueError("wrong value in 'shock' variable")
     if prelimestimates == None:
-        print("add values in prelimestimates")
-        return 0
+        raise ValueError("add values in prelimestimates")
     if nshock <= 0:
-        print('Number of shocks must be > 0')
-        return 0
+        raise ValueError('Number of shocks must be > 0')
     if (nshock == 1 or nshock >= 3) and shock == 'mixed':
-        print('Sorry but we have not implemented a model with % i mixed shocks' % nshock)
-        return 0
+        raise ValueError('Sorry but we have not implemented a model with % i mixed shocks' % nshock)
 
     if type(shock) != list():
         shock = [shock]
@@ -128,41 +125,45 @@ def gbm(series, shock, nshock, prelimestimates, alpha=0.05, oos=None, display=Tr
         shock = ['exp', 'rett'] 
         intx = _mix_intx_gen
         xt = _mix_xt_gen
+    else:
+        raise KeyError("Wrong shock value, choose between 'exp', 'rett', and 'mixed'")
 
-    def _z(shock_par, t, nshock, intx):
-        z_part = 0.       
-        m = shock_par[0]
-        p = shock_par[1]
-        q = shock_par[2]
+    with warnings.catch_warnings(record=True) as w:
 
-        for i in range(1, nshock+1):
-            z_part += intx(t, i, shock_par)                        
+        def _z(shock_par, t, nshock, intx):
+            z_part = 0.       
+            m = shock_par[0]
+            p = shock_par[1]
+            q = shock_par[2]
 
-        z_prime = z_part + t
-        z = m * (1 - np.exp((-(p+q)*z_prime), dtype= np.float64)) / (1+(q/p)*np.exp((-(p+q)*z_prime), dtype=np.float64))
-        return z
+            for i in range(1, nshock+1):
+                z_part += intx(t, i, shock_par)                        
 
-    def _zprime(shock_par, t, nshock, intx, xt):
-        xi = 0        
-        m = shock_par[0]
-        p = shock_par[1]
-        q = shock_par[2]
+            z_prime = z_part + t
+            z = m * ((1- np.exp(-(p+q)*z_prime)) / (1+(q/p)*np.exp(-(p+q)*z_prime)))   
+            return z
 
-        for i in range(1, nshock+1):
-            xi += xt(t, i, shock_par)
+        def _zprime(shock_par, t, nshock, intx, xt):
+            xi = 0        
+            m = shock_par[0]
+            p = shock_par[1]
+            q = shock_par[2]
 
-        x_t = 1 + xi
-        z_t = _z(shock_par, t, nshock, intx)
-        z_prime = (p + q * (z_t/m)) * (m - z_t) * x_t
-        return z_prime
+            for i in range(1, nshock+1):
+                xi += xt(t, i, shock_par)
 
-    def _residuals(shock_par, t, nshock, intx):
-        return cumsum - _z(shock_par, t, nshock, intx)
+            x_t = 1 + xi
+            z_t = _z(shock_par, t, nshock, intx)
+            z_prime = (p + q * (z_t/m)) * (m - z_t) * x_t
+            return z_prime
 
-    optim = opt.leastsq(func=_residuals, x0=prelimestimates, args=(t, nshock, intx), full_output=1)
+        def _residuals(shock_par, t, nshock, intx):
+            return cumsum - _z(shock_par, t, nshock, intx)
+
+        optim = opt.leastsq(func=_residuals, x0=prelimestimates, args=(t, nshock, intx), full_output=1)
     
-    res = optim[2]['fvec']
-
+    if w:
+        raise ValueError('Error encountered during the optimization, try with other parameters')
 
     model = {
         'type' :"Generalized Bass Model",
@@ -171,7 +172,7 @@ def gbm(series, shock, nshock, prelimestimates, alpha=0.05, oos=None, display=Tr
         'method' : "nls",
         'alpha' : alpha,
         'optim' : optim,
-        'residuals' : res,        
+        'residuals' : optim[2]['fvec'],        
         'shocks' : [nshock, shock],
         'x_functions': [intx, xt],
         }

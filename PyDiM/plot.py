@@ -101,8 +101,6 @@ def dimora_plot(model, plot_type = 'all', oos=0, legend=None, index_as_label=Fal
         title_res = 'Residuals over time'
         title_acf = 'ACF Residual'
 
-        print("-----  Predict Total %s seconds ---" % (predictions_time - start_time)) 
-
         start_time = time.time()
 
         if not index_as_label:
@@ -144,7 +142,7 @@ def dimora_plot(model, plot_type = 'all', oos=0, legend=None, index_as_label=Fal
         if plot_type == 'fit':
             fig, ax = plt.subplots(1,2)          
             _plot(ind, cumsum, xlim, z, z_fit, 'Cumulative', ax[0], ['', 'z(t)'], legend)
-            _plot(ind, model['data'], xlim, z_prime, z_prime_fit, 'Instantaneous', ax[1], ['t', "z'(t)"], legend)
+            _plot(ind, model['data'], xlim, z_prime, z_prime_fit, 'Instantaneous', ax[1], ['', "z'(t)"], legend)
 
         elif plot_type == 'res':
             fig, ax = plt.subplots(1,2)
@@ -152,7 +150,7 @@ def dimora_plot(model, plot_type = 'all', oos=0, legend=None, index_as_label=Fal
 
         else:
             fig, ax = plt.subplots(2,2)
-            _plot(ind, cumsum, xlim, z, z_fit, 'Cumulative', ax[0,0], ['Years', 'z(t)'], legend)
+            _plot(ind, cumsum, xlim, z, z_fit, 'Cumulative', ax[0,0], ['', 'z(t)'], legend)
             _plot(ind, model['data'], xlim, z_prime, z_prime_fit, 'Instantaneous', ax[0,1], ['', "z'(t)"], legend)
             _plot_res(t, res, ax[1], title_res, title_acf)
 

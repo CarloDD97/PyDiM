@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as opt
+import warnings
 
 from PyDiM import BM, _lib as lib
 from PyDiM import plot
@@ -7,7 +8,6 @@ from PyDiM import plot
 def ggm(series, mt = None, prelimestimates = None, alpha = 0.05, oos=None, display = True):
     """
     Function that apply the Guseo-Guidolin Model to fit the data
-
     ...
 
     Attributes
@@ -54,57 +54,60 @@ def ggm(series, mt = None, prelimestimates = None, alpha = 0.05, oos=None, displ
         oos = round(len(series)*0.25)
 
     t = np.arange(1, len(series) + 1, 1)
-    x_lim = np.arange(1, len(series) + 1 + oos, 1)
     cumsum = np.cumsum(series)
 
-    def _mt_func(t, K, pc, qc):
-        mt = K * np.sqrt(np.abs((1 - np.exp(-(pc + qc) * t)) / (1 + (qc / pc) * np.exp(-(pc + qc) * t))))
-        return mt
+    with warnings.catch_warnings(record=True) as w:
 
-    def _z_base_mt(t, par, mt):
-        K, ps, qs, pc, qc = tuple(par[0:])
-        z = mt(t, K, pc, qc) * (1 - np.exp(-(ps + qs) * t)) / (1 + (qs / ps) * np.exp(-(ps + qs)*t))
-        return z
+        def _mt_func(t, K, pc, qc):
+            mt = K * np.sqrt(np.abs((1 - np.exp(-(pc + qc) * t)) / (1 + (qc / pc) * np.exp(-(pc + qc) * t))))
+            return mt
+
+        def _z_base_mt(t, par, mt):
+            K, ps, qs, pc, qc = tuple(par[0:])
+            z = mt(t, K, pc, qc) * (1 - np.exp(-(ps + qs) * t)) / (1 + (qs / ps) * np.exp(-(ps + qs)*t))
+            return z
+            
+        def _z_defined_mt(t, par, mt):
+            K, ps, qs = tuple(par[0:2])
+            z = K * mt(t) * (1 - np.exp(-(ps + qs) * t)) / (1 + (qs / ps) * np.exp(-(ps + qs)*t))
+            return z
         
-    def _z_defined_mt(t, par, mt):
-        K, ps, qs = tuple(par[0:2])
-        z = K * mt(t) * (1 - np.exp(-(ps + qs) * t)) / (1 + (qs / ps) * np.exp(-(ps + qs)*t))
-        return z
+        def _zprime(t, par):
+            K, ps, qs, pc, qc = tuple(par[0:])
+            F_t = (1 - np.exp(-(pc + qc) * t)) / (1 + (qc / pc) * np.exp(-(pc + qc) * t))
+            G_t = (1 - np.exp(-(ps + qs) * t)) / (1 + (qs / ps) * np.exp(-(ps + qs) * t))
+            
+            ft = (pc * (pc+qc)**2 * np.exp(t*(pc+qc))) / ((pc * np.exp(t*(pc+qc)) + qc)**2)
+            gt = (ps * (ps+qs)**2 * np.exp(t*(ps+qs))) / ((ps * np.exp(t*(ps+qs)) + qs)**2)
+            
+            k1_t = (1/2)* F_t**(-1/2) * G_t * ft
+            k2_t = np.sqrt(F_t) * gt
+
+            return K*(k1_t + k2_t)
+
+        if type(mt) == 'function':
+            _z = _z_defined_mt
+        elif mt == 'base' or mt == None:
+            _z = _z_base_mt
+            mt = _mt_func
+        else:
+            raise KeyError("'mt' parameter must be either a function or None/left blank")
+
+        def _residuals(par, t, mt):
+            return cumsum - _z(t, par, mt)
+
+        optim = opt.leastsq(func=_residuals, x0=prelimestimates, args=(t, mt), full_output=1)
     
-    def _zprime(t, par):
-        K, ps, qs, pc, qc = tuple(par[0:])
-        F_t = (1 - np.exp(-(pc + qc) * t)) / (1 + (qc / pc) * np.exp(-(pc + qc) * t))
-        G_t = (1 - np.exp(-(ps + qs) * t)) / (1 + (qs / ps) * np.exp(-(ps + qs) * t))
-        
-        ft = (pc * (pc+qc)**2 * np.exp(t*(pc+qc))) / ((pc * np.exp(t*(pc+qc)) + qc)**2)
-        gt = (ps * (ps+qs)**2 * np.exp(t*(ps+qs))) / ((ps * np.exp(t*(ps+qs)) + qs)**2)
-        
-        k1_t = (1/2)* F_t**(-1/2) * G_t * ft
-        k2_t = np.sqrt(F_t) * gt
-
-        return K*(k1_t + k2_t)
-
-    if type(mt) == 'function':
-        _z = _z_defined_mt
-    elif mt == 'base' or mt == None:
-        _z = _z_base_mt
-        mt = _mt_func
-    else:
-        raise KeyError("'mt' parameter must be either a function or None/left blank")
-
-    def _residuals(par, t, mt):
-        return cumsum - _z(t, par, mt)
-
-    optim = opt.leastsq(func=_residuals, x0=prelimestimates, args=(t, mt), full_output=1)
-    res = optim[2]['fvec']
-
+    if w:
+        raise ValueError('Error encountered during the optimization, try with other parameters')
+    
     ao = {
         'type' :"Guseo-Guidolin Model",
         'functions' : [_z, _zprime], # <- t, stime[:], mt
         'data' : series,
         'alpha' : alpha,
         'optim' : optim,
-        'residuals' : res,
+        'residuals' : optim[2]['fvec'],
         'market_potential': mt, # <- t, K, pc, qc
         }
     

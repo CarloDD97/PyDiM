@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as opt
+import warnings
 
 from PyDiM import _lib as lib
 from PyDiM import plot
@@ -53,28 +54,33 @@ def bm(series, method="nls", prelimestimates=[], alpha=0.05, oos=None, display=T
 
     t = np.arange(1, len(series)+1, 1)
     cumsum = np.cumsum(series)
-    
-    def _z(t, m, p, q):
-        return (m * (1 - np.exp(- np.multiply((p + q), t))) / (1 + q / p * np.exp(-np.multiply((p + q), t))))
-        
-    def _zprime(t, m, p, q):
-        return (p+q*_z(t, m, p, q)/m)*(m - _z(t, m, p, q))
 
-    def _residuals(par, t):
-        return cumsum - _z(t, par[0], par[1], par[2])
+    with warnings.catch_warnings(record=True) as w:
 
-    def _f(par, t):
-        return np.sum(_residuals(par, t)**2)
+        def _z(t, m, p, q):
+            return (m * (1 - np.exp(- np.multiply((p + q), t))) / (1 + q / p * np.exp(-np.multiply((p + q), t))))
+            
+        def _zprime(t, m, p, q):
+            return (p+q*_z(t, m, p, q)/m)*(m - _z(t, m, p, q))
 
-    if method == "nls":
-        optim = opt.leastsq(func=_residuals, x0=prelimestimates, args=(t), full_output=1)
-        res = optim[2]['fvec']
+        def _residuals(par, t):
+            return cumsum - _z(t, par[0], par[1], par[2])
 
-    elif method == "optim":
-        mass = np.sum(series) + 1000
-        minim = opt.minimize(fun=_f, x0=prelimestimates, args=(t), bounds=[(1e-10, mass), (1e-10, 1), (1e-10, 1)], method='L-BFGS-B')
-        res = _residuals(minim.x, t)
-        optim = [minim.x, minim.fun, res]
+        def _f(par, t):
+            return np.sum(_residuals(par, t)**2)
+
+        if method == "nls":
+            optim = opt.leastsq(func=_residuals, x0=prelimestimates, args=(t), full_output=1)
+            res = optim[2]['fvec']
+
+        elif method == "optim":
+            mass = np.sum(series) + 1000
+            minim = opt.minimize(fun=_f, x0=prelimestimates, args=(t), bounds=[(1e-10, mass), (1e-10, 1), (1e-10, 1)], method='L-BFGS-B')
+            res = _residuals(minim.x, t)
+            optim = [minim.x, minim.fun, res]
+
+    if w:
+        raise ValueError('Error encountered during the optimization, try with other parameters')
 
     model = {
         'type' :"Standard Bass Model",
